@@ -37,5 +37,28 @@ public class SporadicAlarmTask implements Runnable {
         //      citit din PeriodicTelemetryTask; alegeți și justificați în raport)
         //
         // Vezi exemplul exemple/01-taskuri/.../SporadicTaskExample.java
+        long lastAccepted = 0;
+        boolean firstAlarm = true;
+        long minGap = java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(MIN_INTERARRIVAL_MS);
+        while (!Thread.currentThread().isInterrupted()) {
+            try {
+                double temperature = alarmEvents.take();
+                double eventThreshold = AlarmMetadata.take(deviceId);
+                long now = System.nanoTime();
+                if (!firstAlarm && now - lastAccepted < minGap) {
+                    System.out.println("Alarma respinsa: intervalul minim nu a trecut.");
+                    continue;
+                }
+                firstAlarm = false;
+                lastAccepted = now;
+                String text = deviceId + ";" + System.currentTimeMillis() + ";"
+                        + String.format(java.util.Locale.US, "%.2f", temperature) + ";"
+                        + String.format(java.util.Locale.US, "%.2f", eventThreshold);
+                mqtt.publish(Config.alarmTopic(deviceId), text);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
     }
 }
