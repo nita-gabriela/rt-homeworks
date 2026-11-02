@@ -48,8 +48,42 @@ public class CommandConsole implements Runnable {
         //   ("device-1 SET_INTERVAL 1000" -> "device-1" și "SET_INTERVAL 1000")
         //   și publicați comanda pe Config.commandTopic(deviceId).
         //   Afișați un mesaj de eroare dacă linia nu are formatul corect.
-        System.out.println("(trimiterea comenzilor neimplementată): " + line);
+        String[] input = line.split("\\s+", 2);
+        if (input.length != 2 || !input[0].matches("[A-Za-z0-9_-]+")) {
+            System.out.println("Eroare: folositi <deviceId> <COMANDA> [parametru]");
+            return;
+        }
+        String deviceId = input[0];
+        String command = input[1].trim();
+        String[] parts = command.split("\\s+");
+        try {
+            switch (parts[0]) {
+                case "SET_INTERVAL":
+                    if (parts.length != 2) throw new IllegalArgumentException("SET_INTERVAL necesita un parametru");
+                    long interval = Long.parseLong(parts[1]);
+                    if (interval <= 0 || interval > Long.MAX_VALUE / 1_000_000L)
+                        throw new IllegalArgumentException("interval invalid");
+                    break;
+                case "SET_THRESHOLD":
+                    if (parts.length != 2) throw new IllegalArgumentException("SET_THRESHOLD necesita un parametru");
+                    if (!Double.isFinite(Double.parseDouble(parts[1])))
+                        throw new IllegalArgumentException("prag invalid");
+                    break;
+                case "RESET":
+                case "STATUS":
+                    if (parts.length != 1) throw new IllegalArgumentException("comanda nu accepta parametri");
+                    break;
+                default:
+                    throw new IllegalArgumentException("comanda necunoscuta");
+            }
+        } catch (IllegalArgumentException e) {
+            System.out.println("Eroare: " + e.getMessage());
+            return;
+        }
+        mqtt.publish(Config.commandTopic(deviceId), command);
+        System.out.println("Comanda publicata pentru " + deviceId + ": " + command);
     }
+
 
     private void printHelp() {
         System.out.println("Comenzi: show | <deviceId> SET_INTERVAL <ms> | <deviceId> SET_THRESHOLD <valoare>");
